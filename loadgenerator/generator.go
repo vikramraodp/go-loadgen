@@ -3,17 +3,20 @@ package loadgen
 import (
 	"bufio"
 	"fmt"
-	"github.com/intuit/go-loadgen/eventbreaker"
-	metricsUtility "github.com/intuit/go-loadgen/metrics"
-	utility "github.com/intuit/go-loadgen/util"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rcrowley/go-metrics"
-	"github.com/sirupsen/logrus"
-	"go.uber.org/ratelimit"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rcrowley/go-metrics"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/ratelimit"
+
+	"github.com/intuit/go-loadgen/constants"
+	"github.com/intuit/go-loadgen/eventbreaker"
+	metricsUtility "github.com/intuit/go-loadgen/metrics"
+	utility "github.com/intuit/go-loadgen/util"
 )
 
 func wrapUpTask(props *LoadGenProperties, totalLineCount int64) {
@@ -42,11 +45,11 @@ GenerateLoadFromInputFile replays an input sample file from the top of the head 
 */
 func GenerateLoadFromInputFile(promRegistry *prometheus.Registry, props *LoadGenProperties) {
 
-	if props.ReplayCount == 0 && props.durationInSeconds() == 0 {
-		fmt.Print("Error! Stopping the test. \n" +
-			" Test termination factor is missing! Either specify `--duration` or `replay-count`")
-		os.Exit(1)
-	}
+	// if props.ReplayCount == 0 && props.durationInSeconds() == 0 {
+	// 	fmt.Print("Error! Stopping the test. \n" +
+	// 		" Test termination factor is missing! Either specify `--duration` or `replay-count`")
+	// 	os.Exit(1)
+	// }
 
 	fmt.Println("Generating logs by replaying input file...")
 	const MultiLineLimit = 1000
@@ -71,7 +74,11 @@ func GenerateLoadFromInputFile(promRegistry *prometheus.Registry, props *LoadGen
 	}
 
 	rateLimit := ratelimit.New(int(props.Lps))
-	timer := time.After(props.durationInSeconds())
+	duration := props.durationInSeconds()
+	if props.durationInSeconds() <= 0 {
+		duration = constants.MaxDurationInSeconds
+	}
+	timer := time.After(duration)
 	numberOfFiles := int(props.FileCount)
 
 	var multiLineString strings.Builder
@@ -90,7 +97,7 @@ func GenerateLoadFromInputFile(promRegistry *prometheus.Registry, props *LoadGen
 
 	go metrics.Log(goGenMetricsRegistry, 1*time.Second, metricsLogger)
 
-	//prometheus stuff
+	// prometheus stuff
 	var promCounter, promTotalBytesProcessedCounter prometheus.Counter
 	if props.EnableMetrics {
 		promCounter = metricsUtility.GetEventsProcessedCounter()
@@ -201,10 +208,14 @@ func GenerateAlphaNumeric(promRegistry *prometheus.Registry, props *LoadGenPrope
 		fileArray, _ = props.fileRef()
 	}
 
-	//rate limiter settings
+	// rate limiter settings
 	rateLimit := ratelimit.New(int(props.Lps))
-	//duration settings
-	timer := time.After(props.durationInSeconds())
+	// duration settings
+	duration := props.durationInSeconds()
+	if props.durationInSeconds() <= 0 {
+		duration = constants.MaxDurationInSeconds
+	}
+	timer := time.After(duration)
 
 	var totalLineCount float64
 	var singleLineCount float64
@@ -215,7 +226,7 @@ func GenerateAlphaNumeric(promRegistry *prometheus.Registry, props *LoadGenPrope
 	fileCountIndex := 0
 	prev := time.Now()
 
-	//metrics
+	// metrics
 	counter := metrics.NewCounter()
 	goGenMetricsRegistry := metrics.NewRegistry()
 	goGenMetricsRegistry.Register("total_events_processed", counter)
@@ -224,7 +235,7 @@ func GenerateAlphaNumeric(promRegistry *prometheus.Registry, props *LoadGenPrope
 
 	go metrics.Log(goGenMetricsRegistry, 1*time.Second, metricsLogger)
 
-	//prometheus stuff
+	// prometheus stuff
 	var promCounter, promTotalBytesProcessedCounter prometheus.Counter
 	if props.EnableMetrics {
 		promCounter = metricsUtility.GetEventsProcessedCounter()

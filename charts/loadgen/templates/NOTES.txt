@@ -1,0 +1,1 @@
+1. Generates logging load in kubernetes

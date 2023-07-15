@@ -1,15 +1,13 @@
 # Now copy it into our base image.
-FROM golang:1.12
-LABEL maintainer="chaitanya_bhatt@intuit.com"
-RUN mkdir /app
-# copy everything in the root directory into our /app directory
-ADD . /app
-# execute further commands inside our /app directory
-WORKDIR /app
+FROM golang:1.19 as build
+WORKDIR /go/src/app
+COPY . .
+RUN go mod download
+RUN CGO_ENABLED=0 go build -o /go/bin/loadgen
 
-RUN tar -xvzf test-data/qbo-1.log.tar --directory test-data/.
-
-RUN go build -o loadgen .
-
-CMD ["/app/loader"]
+FROM gcr.io/distroless/static-debian11:nonroot
+WORKDIR /
+COPY --from=build /go/bin/loadgen /
+USER 65532:65532
+ENTRYPOINT ["/loadgen"]
 
